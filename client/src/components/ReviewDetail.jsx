@@ -1,50 +1,52 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import RatingStars from "./RatingStars";
 import { useAuthToken } from "../AuthTokenContext";
+import "../style/reviewDetail.css";
+
 function ReviewDetail() {
   const API_URL = process.env.REACT_APP_API_URL;
   const params = useParams();
-
+  const navigate = useNavigate();
   const [album, setAlbum] = useState();
   const [posts, setPosts] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedPost, setSelectedPost] = useState({});
-  const [postToDelete, setPostToDelete] = useState({});
-
   const [userId, setUserId] = useState();
 
   const formRef = useRef();
   const { accessToken } = useAuthToken();
-  console.log("AccessToken in ReviewDetail:", accessToken);
 
   async function getReviewDetails() {
     let res = await fetch(`${API_URL}/api/album/${params.id}`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
     });
-    const album = await res.json();
 
-    if (album) {
-      setAlbum(album);
+    if (res.status === 404) {
+      navigate("../AlbumNotFound");
     }
-    res = await fetch(`${API_URL}/api/posts/${params.id}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
+    const album_data = await res.json();
+
+    if (album_data) {
+      setAlbum(album_data);
+    } else {
+      navigate("../404");
+    }
+
+    res = await fetch(`${API_URL}/api/posts/${params.id}`);
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
     const allPosts = await res.json();
-    console.log("AllPosts", allPosts);
+
     if (allPosts) {
       setPosts(allPosts);
-      console.log("setPosts called!");
     }
-    console.log("Posts", posts);
   }
 
   async function updateUserId() {
@@ -58,35 +60,31 @@ function ReviewDetail() {
     const user = await res.json();
 
     if (user) {
-      console.log("userID", user.id);
       setUserId(user.id);
     }
   }
 
   useEffect(() => {
-    console.log("useEffect called!");
     if (params.id) {
       getReviewDetails();
     }
-    updateUserId();
+  }, []);
+
+  useEffect(() => {
+    if (params.id && accessToken) {
+      getReviewDetails();
+      updateUserId();
+    }
   }, [accessToken]);
 
   useEffect(() => {
-    // console.log("selectedPost changed: ");
-    // console.log(selectedPost);
     if (isEditing) {
       formRef.current.elements.rating.value = selectedPost.rating;
       formRef.current.elements.comment.value = selectedPost.content;
     }
   }, [selectedPost]);
 
-  useEffect(() => {
-    console.log("postToDelete changed: ");
-    console.log(postToDelete);
-    deletePost();
-  }, [postToDelete]);
-
-  const handleSubmit = async (event) => {
+  const handleUpdate = async (event) => {
     event.preventDefault();
     const updatedPost = {
       rating: event.target.elements.rating.value,
@@ -107,15 +105,45 @@ function ReviewDetail() {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
 
-      getReviewDetails();
-      setIsEditing(false);
+      setTimeout(() => {
+        setIsEditing(false);
+        getReviewDetails();
+      }, 1000);
     } catch (error) {
       console.error("Error occurs when submitting data: ", error);
     }
   };
 
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const newPost = {
+      artist_id: album.artistId,
+      album_id: album.id,
+      rating: event.target.elements.rating.value,
+      content: event.target.elements.comment.value,
+    };
+
+    try {
+      const res = await fetch(`${API_URL}/api/post`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(newPost),
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
+      setTimeout(() => {
+        getReviewDetails();
+      }, 1000);
+    } catch (error) {
+      console.error("Error occurs when submitting data: ", error);
+    }
+  };
   const handleEditClick = (post) => {
-    //console.log(post);
     if (!isEditing) {
       setSelectedPost(post);
       setIsEditing(true);
@@ -124,144 +152,255 @@ function ReviewDetail() {
     }
   };
 
-  const deletePost = async () => {
-    console.log("deletePost called");
-    console.log(postToDelete);
-    console.log(postToDelete.id);
-    // try {
-    //   console.log(postToDelete.id);
-    //   console.log(`${API_URL}/api/post/${String(postToDelete.id)}`);
-    //   const res = await fetch(
-    //     `${API_URL}/api/post/${String(postToDelete.id)}`,
-    //     {
-    //       method: "DELETE",
-    //     }
-    //   );
-    //   console.log(res);
-    //   if (!res.ok) {
-    //     throw new Error(`HTTP error! status: ${res.status}`);
-    //   }
-    //   window.location.reload();
-    // } catch (error) {
-    //   console.error("Error occurs when submitting data: ", error);
-    // }
+  const deletePost = async (post) => {
+    try {
+      const res = await fetch(`${API_URL}/api/post/${post.id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      if (posts.length === 1) {
+        deleteAlbum();
+      } else {
+        setTimeout(() => {
+          getReviewDetails();
+        }, 1000);
+      }
+    } catch (error) {
+      console.error("Error occurs when submitting data: ", error);
+    }
+  };
+
+  const deleteAlbum = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/album/${album.id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      navigate("/home");
+    } catch (error) {
+      console.error("Error occurs when submitting data: ", error);
+    }
   };
 
   return (
     <>
-      {userId && album && (
+      {album && (
         <div>
-          <h2>Review Detail of Album --- {album.title} </h2>
-          <h2>User Id -- {userId}</h2>
+          <h2>{album.title} </h2>
           <img
+            className="album-pic"
             src={album.imgURL}
-            alt={album.title}
-            style={{ width: "300px", height: "300px" }}
+            alt={`album name: ${album.title}; artist name: ${album.artistName}`}
           />
-          <ul>
-            <li>Alblum: {album.title}</li>
-            <li>Artist: {album.artistName}</li>
-            <li>
-              Average Rating: <RatingStars rating={album.rating} />
-            </li>
-          </ul>
+          <div className="album-info">
+            <table className="table table-borderless table-striped table-hover">
+              <tbody>
+                <tr>
+                  <th scope="row">Name</th>
+                  <td>{album.title}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Artist</th>
+                  <td>{album.artistName}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Release</th>
+                  <td>{album.release}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Tracks</th>
+                  <td>{album.tracks}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Ratings</th>
+                  <td>
+                    <RatingStars rating={album.rating} />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-          {posts.filter((post) => post.userId === userId).length !== 0 ? (
-            <>
-              <h3>My Review</h3>
-              {posts
-                .filter((post) => post.userId === userId)
-                .map((post) => (
-                  <ul key={post.id}>
-                    <button onClick={() => handleEditClick(post)}>Edit</button>
-                    <button onClick={() => setPostToDelete(post)}>
-                      Delete
-                    </button>
-                    {!isEditing && (
-                      <>
-                        <li>
-                          Rating: <RatingStars rating={post.rating} />
-                        </li>
-                        <li>Comment: {post.content}</li>
-                      </>
-                    )}
+      {posts &&
+        (userId ? (
+          <>
+            {posts.filter((post) => post.userId === userId).length !== 0 ? (
+              <>
+                <h3>My Review</h3>
+                {posts
+                  .filter((post) => post.userId === userId)
+                  .map((post) => (
+                    <div key={post.id}>
+                      <button
+                        className="button"
+                        onClick={() => handleEditClick(post)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="button"
+                        onClick={() => deletePost(post)}
+                      >
+                        Delete
+                      </button>
+                      {!isEditing && (
+                        <ul className="review">
+                          <li>
+                            Rating: <RatingStars rating={post.rating} />
+                          </li>
+                          <li>Comment: {post.content}</li>
+                        </ul>
+                      )}
 
-                    {isEditing && (
-                      <form ref={formRef} onSubmit={handleSubmit}>
-                        <div>
+                      {isEditing && (
+                        <div className="container mt-5">
+                          <div className="row justify-content-center">
+                            <div className="col-md-6">
+                              <form ref={formRef} onSubmit={handleUpdate}>
+                                <div className="form-group">
+                                  <label htmlFor="rating">Rating:</label>
+                                  <select
+                                    type="number"
+                                    className="form-control"
+                                    id="rating"
+                                    name="rating"
+                                    defaultValue={selectedPost.rating}
+                                    required
+                                  >
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                  </select>
+                                </div>
+                                <div className="form-group">
+                                  <label htmlFor="comment">Comment:</label>
+                                  <textarea
+                                    id="comment"
+                                    className="form-control"
+                                    name="comment"
+                                    defaultValue={selectedPost.content}
+                                    required
+                                  ></textarea>
+                                </div>
+                                <button className="button" type="submit">
+                                  Update
+                                </button>
+                              </form>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </>
+            ) : (
+              <>
+                <div className="container mt-5">
+                  <div className="row justify-content-center">
+                    <div className="col-md-6">
+                      <h3 className="text-center">Post your review</h3>
+
+                      <form onSubmit={handleSubmit}>
+                        <div className="form-group">
                           <label htmlFor="rating">Rating:</label>
-                          <input
-                            type="number"
+                          <select
+                            className="form-control"
                             id="rating"
                             name="rating"
-                            min="0"
-                            max="5"
-                            defaultValue={selectedPost.rating}
                             required
-                          />
+                          >
+                            <option value="">Select a rating</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                          </select>
                         </div>
-                        <div>
+                        <div className="form-group">
                           <label htmlFor="comment">Comment:</label>
                           <textarea
+                            className="form-control"
                             id="comment"
                             name="comment"
-                            defaultValue={selectedPost.content}
+                            rows="4"
                             required
                           ></textarea>
                         </div>
-                        <button type="submit">Update</button>
+                        <button className="button" type="submit">
+                          Post
+                        </button>
                       </form>
-                    )}
-                  </ul>
-                ))}
-            </>
-          ) : (
-            <>
-              <h3>Post your review</h3>
-              <form onSubmit={handleSubmit}>
-                <div>
-                  <label htmlFor="rating">Rating:</label>
-                  <input
-                    type="number"
-                    id="rating"
-                    name="rating"
-                    min="0"
-                    max="5"
-                    defaultValue={selectedPost.rating}
-                    required
-                  />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label htmlFor="comment">Comment:</label>
-                  <textarea
-                    id="comment"
-                    name="comment"
-                    defaultValue={selectedPost.content}
-                    required
-                  ></textarea>
-                </div>
-                <button type="submit">Post</button>
-              </form>
-            </>
-          )}
+              </>
+            )}
 
-          {posts.filter((post) => post.userId !== userId).length !== 0 && (
-            <>
-              <h3>Review of Others</h3>
-              {[...posts]
-                .filter((post) => post.userId !== userId)
-                .map((post) => (
-                  <ul key={post.id}>
-                    <li>
-                      Rating: <RatingStars rating={post.rating} />
-                    </li>
-                    <li>Comment: {post.content}</li>
-                  </ul>
-                ))}
-            </>
-          )}
-        </div>
-      )}
+            {posts.filter((post) => post.userId !== userId).length !== 0 && (
+              <>
+                <h3>Review of Others</h3>
+                <div className="table-container">
+                  {posts
+                    .filter((post) => post.userId !== userId)
+                    .map((post) => (
+                      <table
+                        className="table table-borderless table-hover review-table"
+                        key={post.id}
+                      >
+                        <tbody>
+                          <tr>
+                            <td>
+                              <RatingStars rating={post.rating} />
+                            </td>
+                            <td>{post.content}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    ))}
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <p>To leave your review, please login.</p>
+            <h3>Reviews</h3>
+            <div className="table-container">
+              {posts.map((post) => (
+                <table
+                  className="table table-borderless table-hover review-table"
+                  key={post.id}
+                >
+                  <tbody>
+                    <tr>
+                      <td>
+                        <RatingStars rating={post.rating} />
+                      </td>
+                      <td>{post.content}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              ))}
+            </div>
+          </>
+        ))}
     </>
   );
 }

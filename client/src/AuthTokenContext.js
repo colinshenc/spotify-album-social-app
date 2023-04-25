@@ -36,14 +36,12 @@ function AuthTokenProvider({ children }) {
         console.log(err);
       }
     };
-    console.log("isAuthenticated", isAuthenticated);
     if (isAuthenticated) {
       getAccessToken();
     }
   }, [getAccessTokenSilently, isAuthenticated]);
 
   const value = { accessToken, setAccessToken };
-  console.log("Data in AuthTokenContext:", value);
   return (
     <AuthTokenContext.Provider value={value}>
       {children}

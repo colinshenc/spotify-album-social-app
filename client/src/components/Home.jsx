@@ -1,30 +1,24 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import RatingStars from "./RatingStars";
-// import { API_URL } from "../constants";
 import { useAuthToken } from "../AuthTokenContext";
 import { useAuth0 } from "@auth0/auth0-react";
 
 function Home() {
   const { isAuthenticated } = useAuth0();
   const [albums, setAlbums] = useState([]);
-  // const { accessToken } = useAuthToken();
-  // console.log("AccessToken: ", accessToken);
+  const [user, setUser] = useState();
 
   const API_URL = process.env.REACT_APP_API_URL;
 
   const navigate = useNavigate();
+  const { accessToken } = useAuthToken();
 
   useEffect(() => {
-    console.log("useEffect called:");
     async function getAlbums() {
-      console.log("getAlbums called:");
-      console.log(`${API_URL}/api/albums`);
-      let res = await fetch(`${API_URL}/api/albums`);
-      console.log("fetched albums");
-      console.log(res);
-      let albums = await res.json();
-      console.log(albums);
+      const res = await fetch(`${API_URL}/api/albums`);
+
+      const albums = await res.json();
 
       if (albums && albums.length) {
         setAlbums(albums);
@@ -32,70 +26,66 @@ function Home() {
     }
 
     getAlbums();
-    console.log("ALBUMS:  ");
-    console.log(albums);
   }, []);
 
-  const handleAlbumClick = (album_id) => {
-    isAuthenticated
-      ? navigate(`../details/${album_id}`)
-      : alert("Please log in to view details of album reviews");
-  };
+  useEffect(() => {
+    async function getUsers() {
+      if (accessToken) {
+        const res = await fetch(`${API_URL}/api/user`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        const user = await res.json();
+        if (user) {
+          setUser(user);
+        }
+      }
+    }
 
+    getUsers();
+  }, [accessToken]);
 
   return (
     <>
       <div>
+        {user && <div>Welcome 👋 {user.name} </div>}
         {isAuthenticated && (
-          <div>
-            <p>Please click this link to leave your review for a new album</p>
-            <h2>
-              <button onClick={() => navigate("../review-new-album")}>Review New Album</button>
-            </h2>
-            <p>
-              If you want to add your review for one of the existing albums
-              below, please click the album.
-            </p>
-          </div>
+          <>
+            <div>
+              <p>Click this button to leave your review for a new album</p>
+              <button
+                className="button"
+                onClick={() => navigate("../review-new-album")}
+              >
+                Review New Album
+              </button>
+            </div>
+            <br />
+          </>
         )}
       </div>
       <div>
-        <h2>Albums Reviewed:</h2>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
+        {<h2>Albums</h2>}
+        <div className="album-container">
           {albums.map((album) => (
             <div
+              className="album-item"
               key={album.id}
-              style={{
-                width: "calc(100% / 4 - 10px)",
-                margin: "10px",
-                padding: "10px",
-                border: "1px solid black",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-              onClick={() => handleAlbumClick(album.id)}
+              onClick={() => navigate(`../details/${album.id}`)}
             >
               <img
+                className="album-img"
                 src={album.imgURL}
-                alt={album.title}
-                style={{
-                  width: "300px",
-                  height: "300px",
-                  objectFit: "cover",
-                }}
+                alt={`album name: ${album.title}; artist name: ${album.artistName}`}
               />
 
               <div style={{ textAlign: "center" }}>
-                <h2>{album.title}</h2>
                 <p>Artist: {album.artistName}</p>
                 <RatingStars rating={album.rating} />
+                <h3>{album.title}</h3>
               </div>
             </div>
           ))}

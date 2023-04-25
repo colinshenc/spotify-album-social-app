@@ -1,12 +1,11 @@
 import React from "react";
 import * as ReactDOMClient from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AppLayout from "./components/AppLayout";
 import Home from "./components/Home";
-import Login from "./components/Login";
 import Profile from "./components/Profile";
 import AddAlbum from "./components/AddAlbum";
-import { Auth0Provider, useAuth0 } from "@auth0/auth0-react";
+import { Auth0Provider } from "@auth0/auth0-react";
 import { AuthTokenProvider } from "./AuthTokenContext";
 import ReviewDetail from "./components/ReviewDetail";
 import NotFound from "./components/NotFound";
@@ -30,16 +29,6 @@ const requestedScopes = [
   "write:post",
 ];
 
-function RequireAuth({ children }) {
-  const { isAuthenticated, isLoading } = useAuth0();
-
-  if (!isLoading && !isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  return children;
-}
-
 root.render(
   <React.StrictMode>
     <Auth0Provider
@@ -56,13 +45,12 @@ root.render(
           <Routes>
             <Route path="/" element={<AppLayout />}>
               <Route path="/home" element={<Home />} />
-              <Route path="/login" element={<Login />} />
               <Route path="/details/:id" element={<ReviewDetail />} />
               <Route path="/verify-user" element={<VerifyUser />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/review-new-album" element={<AddAlbum />} />
+              <Route path="*" element={<NotFound />} />
             </Route>
-            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </AuthTokenProvider>

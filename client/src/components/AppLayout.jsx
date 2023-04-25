@@ -1,54 +1,73 @@
 import "../style/appLayout.css";
 
-import { Outlet, Link, useNavigate} from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 
 export default function AppLayout() {
-  const { user, isLoading, isAuthenticated, logout, loginWithRedirect } =
-    useAuth0();
+  const { isLoading, isAuthenticated, logout, loginWithRedirect } = useAuth0();
 
-  console.log("USER: ", user);
   const navigate = useNavigate();
+
   if (isLoading) {
     return <div className="loading">Loading...</div>;
   }
 
   return (
     <div className="app">
-      <div className="title">
-        <h1>Music Review App</h1>
-      </div>
-      <div className="header">
+      <header className="header">
+        <div className="title">
+          <h1>Album Reviewer</h1>
+        </div>
+
         <nav className="menu">
           <ul className="menu-list">
             <li>
-              <button onClick={() => navigate("../home")}>Home</button>
+              <button
+                className="nav-button"
+                onClick={() => navigate("../home")}
+              >
+                Home
+              </button>
             </li>
-            <li>
-              {!isAuthenticated && (
-                <button className="btn-primary" onClick={loginWithRedirect}>
-                  Login / Sign Up
+
+            {!isAuthenticated ? (
+              <li>
+                <button className="nav-button" onClick={loginWithRedirect}>
+                  Login
                 </button>
-              )}
-            </li>
-            <li>{isAuthenticated && <button onClick={() => navigate("../profile")}>Profile</button>}</li>
-            <li>
-              {isAuthenticated && (
-                <button
-                  className="exit-button"
-                  onClick={() => logout({ returnTo: window.location.origin })}
-                >
-                  LogOut
-                </button>
-              )}
-            </li>
+              </li>
+            ) : (
+              <>
+                <li>
+                  <button
+                    className="nav-button"
+                    onClick={() => navigate("../profile")}
+                  >
+                    Profile
+                  </button>
+                </li>
+
+                <li>
+                  <button
+                    className="nav-button"
+                    onClick={() => logout({ returnTo: window.location.origin })}
+                  >
+                    Logout
+                  </button>
+                </li>
+              </>
+            )}
           </ul>
         </nav>
-        {isAuthenticated && <div>Welcome 👋 {user.nickname} </div>}
-      </div>
+      </header>
+
       <div className="content">
         <Outlet />
       </div>
+
+      <footer className="footer">
+        &copy;{new Date().getFullYear()} Cheng Shen <br />
+      </footer>
     </div>
   );
 }

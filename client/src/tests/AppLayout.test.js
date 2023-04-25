@@ -28,18 +28,17 @@ jest.mock("react-router-dom", () => ({
   },
 }));
 
-test("login/signup button calls loginWithRedirect", async () => {
+test("login button calls loginWithRedirect", async () => {
   render(
     <MemoryRouter initialEntries={["/"]}>
       <AppLayout />
     </MemoryRouter>
   );
 
-  const loginButton = screen.getByText("Login / Sign Up");
+  const loginButton = screen.getByText("Login");
   await userEvent.click(loginButton);
 
   expect(mockLoginWithRedirect).toHaveBeenCalled();
-  //   expect(mockUseNavigate).toHaveBeenCalledWith("/home");
 });
 
 test("clicking profile link will navigate to /navigate", async () => {

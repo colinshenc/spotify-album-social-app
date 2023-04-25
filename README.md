@@ -17,4 +17,6 @@ React components include:
 
 ### Test, accessibility included.
 
+![](app.gif)
+
 Cheng Shen
